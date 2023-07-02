@@ -31,11 +31,11 @@ const db = mongoClient.db()
 app.post("/participants", async (req, res) => {
     const { name } = req.body;
 
-    const schemaUser = Joi.object({
+    const schemaParticipant = Joi.object({
         name: Joi.string().required()
     });
 
-    const validation = schemaUser.validate(req.body, { abortEarly: false });
+    const validation = schemaParticipant.validate(req.body, { abortEarly: false });
 
     if (validation.error) {
         const errors = validation.error.details.map(detail => detail.message);
@@ -44,23 +44,25 @@ app.post("/participants", async (req, res) => {
 
     try {
         const user = await db.collection("participants").findOne({ name: name });
-        if (user) return res.status(409).send("Esse usuário já existe");
+        if (user) return res.sendStatus(409);
 
-        const participant = {
-            name: name,
-            lastStatus: Date.now()
-        };
+        const timestamp = Date.now()
 
-        await db.collection("participants").insertOne(participant);
+
+        await db.collection("participants").insertOne({ name, lastStatus: timestamp });
 
         const message = {
-            user: name,
-            time: dayjs().format('YYYY-MM-DD HH:mm:ss')
+            from: name,
+            to: 'Todos',
+            text: 'entrou na sala...',
+            type: 'status',
+            time: dayjs(timestamp).format('HH:mm:ss')
         };
 
         await db.collection("messages").insertOne(message);
 
         res.sendStatus(201);
+
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -152,6 +154,12 @@ app.get("/messages", async (req, res) => {
         res.status(500).send(err.message);
     }
 });
+
+
+app.get("/test", (req, res) => {
+    res.send("Funciona")
+})
+
 // Ligar a aplicação do servidor para ouvir requisições
 const PORT = 5000
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`))
