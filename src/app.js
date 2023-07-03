@@ -55,7 +55,7 @@ app.post("/participants", async (req, res) => {
         const message = {
             from: name,
             to: 'Todos',
-            text: 'entrou na sala...',
+            text: 'entroa na sala...',
             type: 'status',
             time: dayjs(timestamp).format('HH:mm:ss')
         };
@@ -82,45 +82,44 @@ app.get("/participants", async (req, res) => {
 //post /messages
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
-    const { from } = req.headers;
+    const { user } = req.headers;
 
-    const schemaMessage = Joi.object({
+    console.log(user)
+
+    const schemaParticipant = Joi.object({
         to: Joi.string().required(),
         text: Joi.string().required(),
         type: Joi.string().valid('message', 'private_message').required()
     });
 
-    const { error } = schemaMessage.validate({ to, text, type });
+    const validation = schemaParticipant.validate({ ...req.body, from: user }, { abortEarly: false });
 
-    if (error) {
-        const errors = error.details.map(detail => detail.message);
+
+    if (validation.error) {
+        const errors = validation.error.details.map(detail => detail.message);
         return res.status(422).send(errors);
     }
 
     try {
-        const participant = await db.collection("participants").findOne({ name: from });
+        const participant = await db.collection("participants").findOne({ name: user });
         if (!participant) {
-            return res.status(422).send("O participante 'from' não existe na lista de participantes.");
+            return res.sendStatus(422)
         }
-
-        const time = dayjs().format('HH:mm:ss');
 
         const message = {
             to,
             text,
             type,
-            from,
-            time
+            from: user,
+            time: dayjs().format('HH:mm:ss')
         };
 
         await db.collection("messages").insertOne(message);
-
         return res.sendStatus(201);
     } catch (err) {
         return res.sendStatus(500);
     }
 });
-
 //get messages
 app.get("/messages", async (req, res) => {
     const { User } = req.headers;
