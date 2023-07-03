@@ -1,6 +1,6 @@
 import express from "express"
 import cors from "cors"
-import { MongoClient, ObjectId } from "mongodb"
+import { MongoClient} from "mongodb"
 import dotenv from "dotenv"
 import dayjs from "dayjs"
 import Joi from "joi"
@@ -71,7 +71,7 @@ app.post("/participants", async (req, res) => {
 app.get("/participants", async (req, res) => {
     try {
         const participants = await db.collection("participants").find().toArray();
-        res.send(participants || []);
+        res.send(participants);
     } catch (err) {
         res.status(500).send(err.message);
     }
@@ -85,9 +85,10 @@ app.post("/messages", async (req, res) => {
     console.log(User)
 
     const schemaParticipant = Joi.object({
+        from: Joi.string().required(),
         to: Joi.string().required(),
         text: Joi.string().required(),
-        type: Joi.string().valid('message', 'private_message').required()
+        type: Joi.string().required().valid("message", "private_message")
     });
 
     const validation = schemaParticipant.validate({ ...req.body, from: User }, { abortEarly: false });
@@ -105,15 +106,14 @@ app.post("/messages", async (req, res) => {
         }
 
         const message = {
-            to,
-            text,
-            type,
+            ...req.body,
             from: User,
             time: dayjs().format('HH:mm:ss')
         };
 
         await db.collection("messages").insertOne(message);
         return res.sendStatus(201);
+
     } catch (err) {
         return res.sendStatus(500);
     }
@@ -138,7 +138,7 @@ app.get("/messages", async (req, res) => {
             .toArray();
 
         if (limit !== undefined && (limitNum <= 0 || isNaN(limitNum))) {
-            return res.sendStatus(422); nom
+            return res.sendStatus(422);
         }
 
         res.send(messages);
@@ -149,27 +149,51 @@ app.get("/messages", async (req, res) => {
 
 //post status  
 app.post("/status", async (req, res) => {
-    try {
-        const participantName = req.header("User");
-
-        if (!participantName) {
-            return res.status(404).send();
-        }
-
-        const participant = participants.find((p) => p.name === participantName);
-
-        if (!participant) {
-            return res.status(404).send();
-        }
-
-        participant.lastStatus = Date.now();
-
-        return res.status(200).send();
-    } catch (err) {
-        console.error(err);
-        return res.status(500).send("Internal Server Error");
+    const { name: User } = req.headers;
+  
+    if (!User) {
+      return res.sendStatus(404);
     }
-});
+  
+    try {
+      const participant = await db.collection("participants").findOneAndUpdate(
+        { name: User },
+        { $set: { lastStatus: Date.now() } }
+      );
+  
+      if (!participant.value) {
+        return res.sendStatus(404);
+      }
+  
+      return res.sendStatus(200);
+    } catch (err) {
+      return res.sendStatus(500);
+    }
+  });
+
+setInterval(async () => {
+    try {
+        const inactiveParticipants = await db.collection("participants")
+            .find({ lastStatus: { $lt: Date.now() - 10000 } })
+            .toArray()
+
+        if (inactiveParticipants.length > 0) {
+            const messages = inactiveParticipants.map(inactiveParticipants => {
+                return {
+                    from: inactiveParticipants.name,
+                    to: 'Todos',
+                    text: 'sai da sala...',
+                    type: 'status',
+                    time: dayjs().format('HH:mm:ss')
+                }
+            })
+            await db.collection("messages").insertMany(messages)
+            await db.collection("participants").deleteMany({ lastStatus: { $lt: Date.now() - 10000 } })
+        }
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+}, 15000)
 
 // Ligar a aplicação do servidor para ouvir requisições
 const PORT = 5000
