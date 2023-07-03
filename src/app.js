@@ -80,9 +80,7 @@ app.get("/participants", async (req, res) => {
 //post /messages
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
-    const { User } = req.headers;
-
-    console.log(User)
+    const User  = req.headers.user;
 
     const schemaParticipant = Joi.object({
         from: Joi.string().required(),
@@ -101,6 +99,7 @@ app.post("/messages", async (req, res) => {
 
     try {
         const participant = await db.collection("participants").findOne({ name: User });
+        console.log(participant)
         if (!participant) {
             return res.sendStatus(422)
         }
