@@ -1,6 +1,6 @@
 import express from "express"
 import cors from "cors"
-import { MongoClient} from "mongodb"
+import { MongoClient } from "mongodb"
 import dotenv from "dotenv"
 import dayjs from "dayjs"
 import Joi from "joi"
@@ -80,13 +80,13 @@ app.get("/participants", async (req, res) => {
 //post /messages
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
-    const User  = req.headers.user;
+    const User = req.headers.user;
 
     const schemaParticipant = Joi.object({
         from: Joi.string().required(),
         to: Joi.string().required(),
         text: Joi.string().required(),
-        type: Joi.string().required().valid("message", "private_message")
+        type: Joi.string().required().valid("message", "pzxrivate_message")
     });
 
     const validation = schemaParticipant.validate({ ...req.body, from: User }, { abortEarly: false });
@@ -120,7 +120,7 @@ app.post("/messages", async (req, res) => {
 
 //get messages
 app.get("/messages", async (req, res) => {
-    const { User } = req.headers;
+    const User = req.headers.user;
     const { limit } = req.query;
     const limitNum = Number(limit);
 
@@ -142,33 +142,33 @@ app.get("/messages", async (req, res) => {
 
         res.send(messages);
     } catch (err) {
-        res.status(500).send(err.message);
+        res.status(422).send(err.message);
     }
 });
 
 //post status  
 app.post("/status", async (req, res) => {
-    const { name: User } = req.headers;
-  
+    const User = req.headers.user;
+
     if (!User) {
-      return res.sendStatus(404);
-    }
-  
-    try {
-      const participant = await db.collection("participants").findOneAndUpdate(
-        { name: User },
-        { $set: { lastStatus: Date.now() } }
-      );
-  
-      if (!participant.value) {
         return res.sendStatus(404);
-      }
-  
-      return res.sendStatus(200);
-    } catch (err) {
-      return res.sendStatus(500);
     }
-  });
+
+    try {
+        const result = await db.collection("participants").updateOne(
+            { name: User },
+            { $set: { lastStatus: Date.now() } }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.sendStatus(404);
+        }
+
+        return res.sendStatus(200);
+    } catch (err) {
+        return res.sendStatus(500);
+    }
+});
 
 setInterval(async () => {
     try {
