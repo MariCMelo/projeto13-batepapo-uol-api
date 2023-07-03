@@ -5,7 +5,6 @@ import dotenv from "dotenv"
 import dayjs from "dayjs"
 import Joi from "joi"
 
-
 // Criação do app
 const app = express()
 
@@ -13,7 +12,6 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 dotenv.config()
-
 
 // conexão com o banco
 console.log(process.env.DATABASE_URL)
@@ -55,7 +53,7 @@ app.post("/participants", async (req, res) => {
         const message = {
             from: name,
             to: 'Todos',
-            text: 'entroa na sala...',
+            text: 'entra na sala...',
             type: 'status',
             time: dayjs(timestamp).format('HH:mm:ss')
         };
@@ -120,45 +118,56 @@ app.post("/messages", async (req, res) => {
         return res.sendStatus(500);
     }
 });
+
 //get messages
 app.get("/messages", async (req, res) => {
-    const { User } = req.headers;
+    const { user } = req.headers;
     const { limit } = req.query;
-
+    const limitNum = Number(limit);
+  
     try {
-        let query = {
-            $or: [
-                { type: "message" },
-                { from: "Todos" },
-                { to: User },
-                { from: User }
-            ]
-        };
-
-        let options = {};
-
-        if (limit) {
-            const parsedLimit = parseInt(limit);
-
-            if (isNaN(parsedLimit) || parsedLimit <= 0) {
-                return res.status(422).send("O parâmetro 'limit' deve ser um número inteiro positivo.");
-            }
-
-            options.limit = parsedLimit;
-        }
-
-        const messages = await db.collection("messages").find(query).sort({ _id: -1 }).limit(options.limit).toArray();
-
-        res.send(messages);
+      const messages = await db.collection("messages")
+        .find({
+          $or: [
+            { type: "message" },
+            { to: { $in: [user, "Todos"] } },
+            { from: user }
+          ]
+        })
+        .limit(limit === undefined ? 0 : limitNum)
+        .toArray();
+  
+      if (limit !== undefined && (limitNum <= 0 || isNaN(limitNum))) {
+        return res.sendStatus(422);
+      }
+  
+      res.send(messages);
     } catch (err) {
-        res.status(500).send(err.message);
+      res.status(500).send(err.message);
     }
-});
+  });
+  
+//post status  
+app.post("/status", async(req, res) =>{
+    try{
 
+    }   catch(err) {
 
-app.get("/test", (req, res) => {
-    res.send("Funciona")
+    }
 })
+
+//get status  
+app.get("/status", async(req, res) =>{
+    try{
+
+    }   catch(err) {
+
+    }
+})
+
+  app.get("/test", (req, res) => {
+    res.send("Funciona");
+  });
 
 // Ligar a aplicação do servidor para ouvir requisições
 const PORT = 5000
