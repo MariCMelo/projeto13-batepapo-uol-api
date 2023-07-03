@@ -42,8 +42,8 @@ app.post("/participants", async (req, res) => {
     }
 
     try {
-        const user = await db.collection("participants").findOne({ name: name });
-        if (user) return res.sendStatus(409);
+        const User = await db.collection("participants").findOne({ name: name });
+        if (User) return res.sendStatus(409);
 
         const timestamp = Date.now()
 
@@ -80,9 +80,9 @@ app.get("/participants", async (req, res) => {
 //post /messages
 app.post("/messages", async (req, res) => {
     const { to, text, type } = req.body;
-    const { user } = req.headers;
+    const { User } = req.headers;
 
-    console.log(user)
+    console.log(User)
 
     const schemaParticipant = Joi.object({
         to: Joi.string().required(),
@@ -90,7 +90,7 @@ app.post("/messages", async (req, res) => {
         type: Joi.string().valid('message', 'private_message').required()
     });
 
-    const validation = schemaParticipant.validate({ ...req.body, from: user }, { abortEarly: false });
+    const validation = schemaParticipant.validate({ ...req.body, from: User }, { abortEarly: false });
 
 
     if (validation.error) {
@@ -99,7 +99,7 @@ app.post("/messages", async (req, res) => {
     }
 
     try {
-        const participant = await db.collection("participants").findOne({ name: user });
+        const participant = await db.collection("participants").findOne({ name: User });
         if (!participant) {
             return res.sendStatus(422)
         }
@@ -108,7 +108,7 @@ app.post("/messages", async (req, res) => {
             to,
             text,
             type,
-            from: user,
+            from: User,
             time: dayjs().format('HH:mm:ss')
         };
 
@@ -121,53 +121,55 @@ app.post("/messages", async (req, res) => {
 
 //get messages
 app.get("/messages", async (req, res) => {
-    const { user } = req.headers;
+    const { User } = req.headers;
     const { limit } = req.query;
     const limitNum = Number(limit);
-  
+
     try {
-      const messages = await db.collection("messages")
-        .find({
-          $or: [
-            { type: "message" },
-            { to: { $in: [user, "Todos"] } },
-            { from: user }
-          ]
-        })
-        .limit(limit === undefined ? 0 : limitNum)
-        .toArray();
-  
-      if (limit !== undefined && (limitNum <= 0 || isNaN(limitNum))) {
-        return res.sendStatus(422);
-      }
-  
-      res.send(messages);
+        const messages = await db.collection("messages")
+            .find({
+                $or: [
+                    { type: "message" },
+                    { to: { $in: [User, "Todos"] } },
+                    { from: User }
+                ]
+            })
+            .limit(limit === undefined ? 0 : limitNum)
+            .toArray();
+
+        if (limit !== undefined && (limitNum <= 0 || isNaN(limitNum))) {
+            return res.sendStatus(422); nom
+        }
+
+        res.send(messages);
     } catch (err) {
-      res.status(500).send(err.message);
+        res.status(500).send(err.message);
     }
-  });
-  
+});
+
 //post status  
-app.post("/status", async(req, res) =>{
-    try{
+app.post("/status", async (req, res) => {
+    try {
+        const participantName = req.header("User");
 
-    }   catch(err) {
+        if (!participantName) {
+            return res.status(404).send();
+        }
 
+        const participant = participants.find((p) => p.name === participantName);
+
+        if (!participant) {
+            return res.status(404).send();
+        }
+
+        participant.lastStatus = Date.now();
+
+        return res.status(200).send();
+    } catch (err) {
+        console.error(err);
+        return res.status(500).send("Internal Server Error");
     }
-})
-
-//get status  
-app.get("/status", async(req, res) =>{
-    try{
-
-    }   catch(err) {
-
-    }
-})
-
-  app.get("/test", (req, res) => {
-    res.send("Funciona");
-  });
+});
 
 // Ligar a aplicação do servidor para ouvir requisições
 const PORT = 5000
